@@ -1,0 +1,24 @@
+Summary:
+Run time: 02 hours, 14 minutes, 09 seconds
+Iterations: 2 started / 1 completed
+Tested cores: 4 cores / 8 tests
+Core 0 (2x), Core 1 (2x), Core 2 (2x), Core 3 (2x)
+The following cores have thrown an error:
+ - 1, 3
+
+Core 1 | CPU 2 | 2026-04-24 12:15:00 | CALCULATIONERROR
+ - FATAL ERROR: Rounding was 0.5, expected less than 0.4
+
+Core 3 | CPU 6 | 2026-04-24 12:35:00 | WHEAERROR
+ - There has been a WHEA error while running this test and the setting to treat this as an error has been set!
+Processor APIC ID: 6
+
+There have been WHEA errors while testing:
+ - Core 1 (1x), Core 3 (2x)
+
+Note that it is not necessarily the tested core that caused the WHEA error
+Check the Windows Event Log for more details
+There have been adjustments to the Curve Optimizer values:
+Core              C0 |  C1 |  C2 |  C3
+Starting values  -20 | -20 | -15 | -30
+Current values   -20 | -17 | -15 | -28

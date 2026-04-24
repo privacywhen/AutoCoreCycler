@@ -1,0 +1,11 @@
+Summary:
+Run time: 02 hours, 14 minutes, 09 seconds
+Iterations: 2 started / 2 completed
+Tested cores: 4 cores / 8 tests
+Core 0 (2x), Core 1 (2x), Core 2 (2x), Core 3 (2x)
+No core has thrown an error
+No WHEA errors were observed during the test
+There have been adjustments to the Curve Optimizer values:
+Core              C0 |  C1 |  C2 |  C3
+Starting values  -20 | -20 | -15 | -30
+Current values   -20 | -17 | -15 | -28
