@@ -1,14 +1,15 @@
 {
   "repo_name": "AutoCoreCycler",
   "source_path": "C:/Users/micro/OneDrive/Documents/GitHub/AutoCoreCycler",
-  "source_sha": "613dc65c78ebab8285ca81e2def6ac5ceb2959dd",
-  "generated_at": "2026-08-15T06:49:35Z",
+  "source_sha": "a266f9e6bbe0e03c5fe912f97100d86a313d6207",
+  "generated_at": "2026-08-15T13:34:19Z",
   "generator": "hermes-agent code-wiki skill v0.1.0",
   "output_path": "C:/Users/micro/OneDrive/Documents/GitHub/AutoCoreCycler/docs/wiki",
   "source_snapshot_notes": [
-    "ISSUES.md had uncommitted modifications when generated.",
-    "helpers/discovery-state.psm1 and tests/DiscoveryState.Tests.ps1 were untracked.",
-    "The discovery-state module is documented as unintegrated Phase 1 scaffolding."
+    "Documentation is aligned to committed HEAD a266f9e6bbe0e03c5fe912f97100d86a313d6207 plus the current Phase 3 worktree seam.",
+    "At refresh time, tracked source edits were present in ISSUES.md, PLAN.md, and helpers/discovery-child-launch.psm1.",
+    "At refresh time, tests/DiscoveryChildExecutor.Tests.ps1 was an untracked source test for the harmless synthetic launch boundary.",
+    "The Phase 3 child-launch adapter remains isolated and is not wired to production CoreCycler runtime behavior."
   ],
   "modules_documented": [
     "main-orchestrator",
@@ -17,6 +18,9 @@
     "stress-test-adapters",
     "affinity-and-whea",
     "discovery-state",
+    "discovery-stage-evidence",
+    "discovery-suite-coordinator",
+    "discovery-child-launch",
     "configuration-profiles",
     "administrative-helpers"
   ]

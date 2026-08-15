@@ -243,6 +243,49 @@ function Test-DiscoveryStageChildLaunchPlanReadiness {
     return @{ Ready = $true; Reason = 'ready' }
 }
 
+function Start-DiscoveryStageChildFromPlan {
+    param(
+        [Parameter(Mandatory=$true)] [PSObject] $Plan
+    )
+
+    $readiness = Test-DiscoveryStageChildLaunchPlanReadiness -Plan $Plan
+    if (!$readiness.Ready) {
+        return [PSCustomObject]@{ Launched = $false; Reason = $readiness.Reason; ChildProcessId = $null; Context = $null }
+    }
+
+    try {
+        $childProcess = Start-Process -FilePath $Plan.FilePath -ArgumentList $Plan.ArgumentList -WorkingDirectory $Plan.WorkingDirectory -PassThru -ErrorAction Stop
+    }
+    catch {
+        return [PSCustomObject]@{ Launched = $false; Reason = 'child_launch_failed'; ChildProcessId = $null; Context = $null }
+    }
+
+    try {
+        $candidateProcessId = $childProcess.Id
+        if ($candidateProcessId -isnot [Int] -or $candidateProcessId -lt 1) {
+            throw 'Child process identity is unavailable.'
+        }
+        $childProcessId = $candidateProcessId
+    }
+    catch {
+        return [PSCustomObject]@{ Launched = $true; Reason = 'child_process_identity_unavailable'; ChildProcessId = $null; Context = $null }
+    }
+
+    try {
+        $startedAt = $childProcess.StartTime.ToUniversalTime()
+    }
+    catch {
+        return [PSCustomObject]@{ Launched = $true; Reason = 'child_start_time_unavailable'; ChildProcessId = $childProcessId; Context = $null }
+    }
+
+    $observation = New-DiscoveryStageContextFromObservedChild -Plan $Plan -ChildProcessId $childProcessId -StartedAt $startedAt
+    if (!$observation.Observed) {
+        return [PSCustomObject]@{ Launched = $true; Reason = $observation.Reason; ChildProcessId = $childProcessId; Context = $null }
+    }
+
+    return [PSCustomObject]@{ Launched = $true; Reason = 'launched'; ChildProcessId = $childProcessId; Context = $observation.Context }
+}
+
 function New-DiscoveryStageContextFromObservedChild {
     param(
         [Parameter(Mandatory=$true)] [PSObject] $Plan,
@@ -278,4 +321,4 @@ function New-DiscoveryStageContextFromObservedChild {
     return [PSCustomObject]@{ Observed = $true; Reason = 'observed'; Context = $context }
 }
 
-Export-ModuleMember -Function New-DiscoveryStageChildLaunchPlan, Test-DiscoveryStageChildLaunchPlanReadiness, New-DiscoveryStageContextFromObservedChild
+Export-ModuleMember -Function New-DiscoveryStageChildLaunchPlan, Test-DiscoveryStageChildLaunchPlanReadiness, Start-DiscoveryStageChildFromPlan, New-DiscoveryStageContextFromObservedChild

@@ -22,11 +22,11 @@ Run CoreCycler.bat
 
 On first use CoreCycler creates a configuration file with setting descriptions. Review it before running a workload; [`configs/default.config.ini`](../../configs/default.config.ini) and supplied profiles are the starting references.
 
-## Existing ATM and discovery status
+## Discovery implementation status
 
-[`configs/Ryzen.AutomaticTestMode.Start.ini`](../../configs/Ryzen.AutomaticTestMode.Start.ini) demonstrates existing Ryzen ATM. Existing ATM adjusts from start values toward `maxValue` after errors and uses a configured number of consecutive passes for legacy `confirmed` state. That is not the planned descending discovery workflow.
+Phases 1 and 2 have pure and persistence-tested foundations. Phase 3 currently provides stage config/evidence identity, an ordered synthetic suite reducer, deterministic child plans, readiness validation, externally observed PID/UTC binding, and an isolated plan-to-child launch seam.
 
-The planned next phase is **Phase 1: pure discovery semantics**. The untracked discovery module and Pester tests do not connect to production launch, CO writes, workloads, or resume. Do not treat them as an executable discovery mode.
+This is **not yet an executable discovery mode**. The Phase 3 helpers are not wired to CoreCycler result parsing, a production coordinator, CO application, scheduler/resume flow, UAC/elevation, or hardware. The executor test starts only a harmless temporary PowerShell child. Do not treat the current foundation tests as validation of real workload stability.
 
 ## Safety
 
@@ -41,7 +41,7 @@ The planned next phase is **Phase 1: pure discovery semantics**. The untracked d
 |---|---|
 | `configs/` | Default and workload/ATM profiles. |
 | `logs/` | Runtime logs and append-only result files, created at runtime. |
-| `.automode` / `.automode-bak` | Runtime recovery state at repository root. |
-| `helpers/` | Event Log and automatic-resume scripts. |
+| `.automode` / `.automode-bak` | Runtime recovery state at repository root, optionally containing discovery snapshots. |
+| `helpers/` | Event Log, automatic-resume, and discovery contract modules. |
 | `tools/` | Topology and CO/voltage tools. |
 | `test_programs/` | Bundled/expected stress-program directories. |
