@@ -4,7 +4,7 @@
 
 Implementation sequence for `GOAL.md` and `DESIGN.md`. This file does **not** authorize work by itself. Implement only the explicitly authorized phase; do not solve later phases early unless required to avoid a demonstrated dead end.
 
-**Next:** Phase 1  
+**Next:** Phase 3 — multi-workload gate (config/evidence foundation in progress)
 **Hardware:** not authorized by this plan
 
 When a phase changes shared upstream behaviour, apply the focused characterization rule in `AGENTS.md` and include the affected legacy behaviour in that phase's gate.
@@ -45,7 +45,11 @@ When a phase changes shared upstream behaviour, apply the focused characterizati
 
 **Objective:** Produce one candidate result from the complete required suite while reusing CoreCycler execution/parsing.
 
-**Feasibility checkpoint:** inspect the actual workload/config/process lifecycle before choosing coordinator form. Prefer a small in-process coordinator if clean; otherwise use the smallest hybrid orchestration preserving the evidence contract. Do not duplicate parsers, affinity, or CO control.
+**Feasibility checkpoint:** **complete — use a minimal hybrid coordinator.** Each workload stage runs as a fresh CoreCycler child invocation; the coordinator retains discovery state and consumes only an explicitly stage-scoped terminal result. In-process switching is rejected because CoreCycler selects startup-global configuration/adapter state, rewrites program-global configuration, and retains parser/process state. Do not duplicate parsers, affinity, WHEA collection, or CO control.
+
+**Immediate prerequisites:** stage-scoped non-mutating config delivery; candidate/stage-scoped config/log/PID/start-time identity; explicit terminal result classification; verified child exit and expected stress-process cleanup before another stage. These are Phase 3 implementation requirements, not hardware authorization.
+
+**Current pure foundation:** config selection and stage-result identity are now reduced through a synthetic coordinator. It requires ordered completion, rejects stale/out-of-order context, blocks advancement without child exit and expected-process cleanup, converts only the final ordered `PASS` into `OBSERVED_PASS`, and fail-stops attributable/ambiguous outcomes. Infrastructure-invalid evidence leaves the candidate unchanged and explicitly requires a fresh stage identity before any later retry. A deterministic non-executing child plan now carries the explicit config path, config-byte fingerprint, fresh log target, and stage identity template. A pure readiness check revalidates child-script availability, config bytes, and log freshness immediately before any future launch; it does not start a child or execute a workload. A separate pure observation adapter accepts only an externally supplied positive PID and explicit UTC start time, rebuilds the matching stage context from the plan, and rejects config drift; it intentionally permits the stage log to exist after the child boundary. It neither launches nor observes a process.
 
 **Deliver:**
 - stable candidate identity across the suite;

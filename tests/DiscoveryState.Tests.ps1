@@ -210,6 +210,37 @@ Describe 'Discovery state transitions' {
 
 
 Describe 'Discovery state persistence' {
+    It 'persists interruption status so only unverified attempts can retry with fresh identities' {
+        $pending = New-DiscoveryCoreState -CoreNumber 2 -CurrentCandidate -18 -PlatformMinimum -30 -CandidateAttemptId 'candidate-core2--18-a' -StageAttemptIds @{ kagari = 'stage-kagari-18-a' }
+        $pendingRoundTrip = Restore-DiscoveryStateSnapshot -Snapshot (ConvertTo-DiscoveryStateSnapshot -States @{ 2 = $pending })
+        $retryDecision = Resolve-DiscoveryInterruption -State $pendingRoundTrip.States[2]
+
+        $retryDecision.Accepted | Should Be $true
+        $retryDecision.Disposition | Should Be 'RETRY_WITH_FRESH_IDENTITIES'
+        (Test-DiscoveryCoreCanBeScheduled -State $retryDecision.State) | Should Be $false
+
+        $retry = New-DiscoveryRetryState -State $retryDecision.State -CandidateAttemptId 'candidate-core2--18-b' -StageAttemptIds @{ kagari = 'stage-kagari-18-b' }
+        $retry['candidateAttemptId'] | Should Be 'candidate-core2--18-b'
+        $retry['stageAttemptIds']['kagari'] | Should Be 'stage-kagari-18-b'
+        (Test-DiscoveryCoreCanBeScheduled -State $retry) | Should Be $true
+
+        { New-DiscoveryRetryState -State $retryDecision.State -CandidateAttemptId 'candidate-core2--18-a' -StageAttemptIds @{ kagari = 'stage-kagari-18-b' } } | Should Throw 'A retry must use a fresh candidate attempt ID.'
+        { New-DiscoveryRetryState -State $retryDecision.State -CandidateAttemptId 'candidate-core2--18-b' -StageAttemptIds @{ kagari = 'stage-kagari-18-a' } } | Should Throw 'A retry must use fresh stage attempt IDs.'
+        { New-DiscoveryRetryState -State $retryDecision.State -CandidateAttemptId 'stage-kagari-18-a' -StageAttemptIds @{ kagari = 'stage-kagari-18-b' } } | Should Throw 'A retry must use a fresh candidate attempt ID.'
+        { New-DiscoveryRetryState -State $retryDecision.State -CandidateAttemptId 'candidate-core2--18-b' -StageAttemptIds @{ kagari = 'candidate-core2--18-a' } } | Should Throw 'A retry must use fresh stage attempt IDs.'
+
+        $verified = New-DiscoveryCoreState -CoreNumber 3 -CurrentCandidate -18 -PlatformMinimum -30 -CandidateAttemptId 'candidate-core3--18-a' -StageAttemptIds @{ kagari = 'stage-kagari-18-a' }
+        $verified['attemptStatus'] = 'APPLIED_VERIFIED'
+        $verifiedRoundTrip = Restore-DiscoveryStateSnapshot -Snapshot (ConvertTo-DiscoveryStateSnapshot -States @{ 3 = $verified })
+        $quarantineDecision = Resolve-DiscoveryInterruption -State $verifiedRoundTrip.States[3]
+
+        $quarantineDecision.Accepted | Should Be $true
+        $quarantineDecision.Disposition | Should Be 'QUARANTINE'
+        $quarantineDecision.State['resolution'] | Should Be 'QUARANTINED_AMBIGUOUS'
+        $quarantineDecision.State['attemptStatus'] | Should Be 'QUARANTINED_INTERRUPTION'
+        (Test-DiscoveryCoreCanBeScheduled -State $quarantineDecision.State) | Should Be $false
+    }
+
     It 'round-trips a discovery state without aliasing its attempt metadata' {
         $state = New-DiscoveryCoreState -CoreNumber 2 -CurrentCandidate -18 -PlatformMinimum -30 -CandidateAttemptId 'candidate-core2--18' -StageAttemptIds @{
             kagari = 'stage-kagari-18'
@@ -273,7 +304,7 @@ Describe 'Discovery state persistence' {
 
     It 'rejects torn state rather than recovering a partial core' {
         $tornSnapshot = [PSCustomObject]@{
-            schemaVersion = 1
+            schemaVersion = 2
             states = [PSCustomObject]@{
                 '2' = [PSCustomObject]@{
                     coreNumber = 2
@@ -289,6 +320,56 @@ Describe 'Discovery state persistence' {
         }
 
         $restored = Restore-DiscoveryStateSnapshot -Snapshot $tornSnapshot
+
+        $restored.Accepted | Should Be $false
+        $restored.Reason | Should Be 'invalid_state'
+        $restored.States.Count | Should Be 0
+    }
+
+    It 'rejects a candidate below the persisted platform minimum' {
+        $belowMinimumSnapshot = [PSCustomObject]@{
+            schemaVersion = 2
+            states = [PSCustomObject]@{
+                '2' = [PSCustomObject]@{
+                    coreNumber = 2
+                    currentCandidate = -31
+                    platformMinimum = -30
+                    candidateAttemptId = 'candidate-core2--31'
+                    stageAttemptIds = [PSCustomObject]@{ kagari = 'stage-kagari-31' }
+                    lastObservedPass = -30
+                    firstObservedFail = $null
+                    discoveryCandidate = $null
+                    resolution = $null
+                }
+            }
+        }
+
+        $restored = Restore-DiscoveryStateSnapshot -Snapshot $belowMinimumSnapshot
+
+        $restored.Accepted | Should Be $false
+        $restored.Reason | Should Be 'invalid_state'
+        $restored.States.Count | Should Be 0
+    }
+
+    It 'rejects a terminal discovery candidate without the supporting pass and failure evidence' {
+        $invalidTerminalSnapshot = [PSCustomObject]@{
+            schemaVersion = 2
+            states = [PSCustomObject]@{
+                '2' = [PSCustomObject]@{
+                    coreNumber = 2
+                    currentCandidate = -18
+                    platformMinimum = -30
+                    candidateAttemptId = 'candidate-core2--18'
+                    stageAttemptIds = [PSCustomObject]@{ kagari = 'stage-kagari-18' }
+                    lastObservedPass = $null
+                    firstObservedFail = $null
+                    discoveryCandidate = -17
+                    resolution = 'DISCOVERY_CANDIDATE'
+                }
+            }
+        }
+
+        $restored = Restore-DiscoveryStateSnapshot -Snapshot $invalidTerminalSnapshot
 
         $restored.Accepted | Should Be $false
         $restored.Reason | Should Be 'invalid_state'

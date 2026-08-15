@@ -96,7 +96,7 @@ Describe 'Discovery persistence integration contract' {
 
         $written = ConvertFrom-Json ([System.IO.File]::ReadAllText($autoModeFile))
         ($written | Get-Member -Name 'discoveryStates') | Should Not BeNullOrEmpty
-        $written.discoveryStates.schemaVersion | Should Be 1
+        $written.discoveryStates.schemaVersion | Should Be 2
 
         $parsed = Get-ParsedAutoModeFile -filePath $autoModeFile
         $parsed['discoveryStates'][2]['candidateAttemptId'] | Should Be 'candidate-core2--18'

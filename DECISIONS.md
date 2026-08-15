@@ -68,3 +68,13 @@ applyConfirmedValuesForNotTestedCores = 0
 **Rationale:** Minimizes regression risk and upstream divergence without forcing brittle wrappers.
 
 **Reopen if:** a smaller shared abstraction provides equally clear semantics and compatibility.
+
+## D008 — Run each discovery workload stage in a fresh CoreCycler child
+
+**Decision:** Use a minimal hybrid coordinator for the Phase 3 multi-workload suite. It retains discovery candidate/stage state and launches one fresh CoreCycler child invocation per workload stage; it does not live-switch workload adapters within one CoreCycler process.
+
+**Rationale:** CoreCycler selects one startup-global configuration/program adapter, rewrites program-global configuration, and retains parser/process state. A fresh child preserves the existing configuration, launch, affinity, parser, WHEA, and cleanup machinery without invasive global-state resets or duplicated logic.
+
+**Constraints:** The coordinator must provide stage-scoped configuration delivery and accept only a terminal result bound to the candidate ID, stage ID, config/log identity, child PID, and stage start time. It must verify child exit and expected stress-process cleanup before starting another stage.
+
+**Reopen if:** a small upstream-supported stage/config boundary becomes available that demonstrably clears all adapter, process, and parser state while preserving legacy behaviour with less complexity.

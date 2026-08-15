@@ -17,8 +17,43 @@
     If set, indicates that we are in Auto Mode and this core was the last one being tested before a reboot/crash
 #>
 param(
-    [Parameter()][AllowEmptyString()] $CoreFromAutoMode = -1
+    [Parameter()][AllowEmptyString()] $CoreFromAutoMode = -1,
+    [Parameter()][AllowEmptyString()] [String] $ConfigPath = ''
 )
+
+function Resolve-CoreCyclerConfigInput {
+    param(
+        [Parameter(Mandatory=$false)][AllowEmptyString()] [String] $ConfigPath,
+        [Parameter(Mandatory=$true)] [String] $DefaultPath
+    )
+
+    if ([String]::IsNullOrWhiteSpace($ConfigPath)) {
+        return @{
+            'Path'       = $DefaultPath
+            'IsExplicit' = $false
+        }
+    }
+
+    $resolvedPath = [System.IO.Path]::GetFullPath($ConfigPath)
+    if (!(Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+        throw 'The explicit config path does not exist or is not a file.'
+    }
+
+    return @{
+        'Path'       = $resolvedPath
+        'IsExplicit' = $true
+    }
+}
+
+function Assert-CoreCyclerConfigMayBeRepaired {
+    param(
+        [Parameter(Mandatory=$true)] [Bool] $IsExplicit
+    )
+
+    if ($IsExplicit) {
+        throw 'An explicit config path cannot be created or repaired.'
+    }
+}
 
 
 
@@ -59,7 +94,9 @@ $scriptStartDateTime           = Get-Date -Format yyyy-MM-dd_HH-mm-ss
 $configsPath                   = 'configs'
 $configsPathAbsolute           = $PSScriptRoot + '\' + $configsPath + '\'
 $configDefaultPath             = $configsPathAbsolute + 'default.config.ini'
-$configUserPath                = $PSScriptRoot + '\config.ini'
+$configInput                   = Resolve-CoreCyclerConfigInput -ConfigPath $ConfigPath -DefaultPath ($PSScriptRoot + '\config.ini')
+$configUserPath                = [String] $configInput['Path']
+$configUserPathIsExplicit      = [Bool] $configInput['IsExplicit']
 $customConfigPath              = $null
 $canUseLogFile                 = $false
 $logBuffer                     = [System.Collections.ArrayList]::new()
@@ -6038,6 +6075,7 @@ function Get-Settings {
 
     # If no config.ini file exists, copy the default values to the config.ini
     if (!(Test-Path -LiteralPath $configUserPath -PathType Leaf)) {
+        Assert-CoreCyclerConfigMayBeRepaired -IsExplicit $configUserPathIsExplicit
         [System.IO.File]::WriteAllLines($configUserPath, $DEFAULT_SETTINGS_STRING)
 
         if (!(Test-Path -LiteralPath $configUserPath -PathType Leaf)) {
@@ -6060,6 +6098,7 @@ function Get-Settings {
             Exit-WithFatalError -text 'Neither config.ini nor default.config.ini found!'
         }
 
+        Assert-CoreCyclerConfigMayBeRepaired -IsExplicit $configUserPathIsExplicit
         [System.IO.File]::WriteAllLines($configUserPath, $DEFAULT_SETTINGS_STRING)
         $userSettings = Import-Settings $configUserPath
     }
@@ -6112,6 +6151,7 @@ function Get-Settings {
             Exit-WithFatalError -text 'Neither config.ini nor default.config.ini found!'
         }
 
+        Assert-CoreCyclerConfigMayBeRepaired -IsExplicit $configUserPathIsExplicit
         [System.IO.File]::WriteAllLines($configUserPath, $DEFAULT_SETTINGS_STRING)
         $userSettings = Import-Settings $configUserPath
     }

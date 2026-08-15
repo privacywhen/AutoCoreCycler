@@ -26,14 +26,12 @@ The design requires verified effective CO application before stability evidence 
 
 ## I002 — Multi-workload transition feasibility
 
-**Class:** `LATER`  
+**Class:** `NOT_A_PROBLEM`
 **Phase:** 3
 
-It is not yet proven that CoreCycler can transition through the required Kagari/Prime95 stages in-process without stale configuration/process state or invasive resets.
+**Resolution:** The Phase 3 lifecycle checkpoint found that CoreCycler selects startup-global settings/adapters, writes program-global configuration, and retains parser/process state. A minimal hybrid coordinator that uses one fresh CoreCycler child per workload stage is the smallest safe form; no in-process adapter-switch seam is required or selected.
 
-**Resolve:** Perform the Phase 3 feasibility checkpoint; use the smallest coordinator form preserving the evidence contract.
-
-**Close when:** the coordinator form is selected from code evidence and its stage boundaries are testable.
+**Closed when:** Code inspection independently established the coordinator form and its stage boundaries: non-mutating stage config delivery, stage-scoped terminal evidence, and verified child/process cleanup.
 
 ## I003 — Unattributed WHEA conflicts with discovery semantics
 
@@ -59,14 +57,14 @@ Existing PR #182 recovery assumes the previously active core may have crashed an
 
 ## I005 — Minimum evidence fingerprint
 
-**Class:** `LATER`  
-**Phase:** 2 / 3
+**Class:** `MUST_FIX_CURRENT_PHASE`
+**Phase:** 3
 
-The minimum context needed to reject stale or incompatible discovery evidence is not finalized.
+The pure foundation now provides an explicit non-mutating child config input, validates stage identity against candidate/stage IDs, config bytes, log identity, PID, and start time, and reduces synthetic stage results through ordered-suite progression. It requires explicit child-exit/process-cleanup evidence, accepts only the final ordered pass as `OBSERVED_PASS`, and fails fast or stops progression for attributable, ambiguous, and infrastructure outcomes. A deterministic child-launch plan validates a non-root stage config, captures its config-byte fingerprint, validates a fresh log target, retains the identity template, and produces the explicit PowerShell argument array without starting a process. A pure just-before-launch readiness check repeats the child-script, config-byte, and log-freshness checks so a mutated plan input cannot cross the later executor boundary. A separate pure observation adapter accepts a caller-supplied positive PID and explicit UTC start time, binds them through the existing stage-context contract, and rejects post-plan config drift without requiring the log to remain absent after launch. It is not wired to actual child launch/runtime parsing, so no real child result can count.
 
-**Resolve:** Include only fields needed to detect materially incompatible evidence, likely CPU/platform state, workload/config identity, and relevant software version. Do not build a generalized environment inventory.
+**Resolve:** Wire the established config/evidence/coordinator contracts through the minimal child coordinator; preserve the same candidate/stage/config/log/PID/start-time binding, and reject missing, mismatched, stale, or post-cleanup-ambiguous evidence. Do not build a generalized environment inventory.
 
-**Close when:** stale/incompatible evidence is rejected by a documented, tested fingerprint.
+**Close when:** synthetic stage progression and stale/incompatible evidence tests prove the coordinator accepts only matching stage evidence **and** a dedicated child-launch seam supplies those contracts from fresh CoreCycler children without invoking a workload in verification.
 
 ## I006 — Phase 1 test environment
 
@@ -75,7 +73,7 @@ The minimum context needed to reject stale or incompatible discovery evidence is
 
 **Resolution:** Windows PowerShell 5.1.22621.6060 and Pester 3.4.0 are installed. Pester 3 supports the repository-local focused command used by Phase 1: Invoke-Pester -Script @{ Path = 'tests\DiscoveryState.Tests.ps1' } -PassThru. No dependency-management machinery was added.
 
-**Closed when:** The focused command ran successfully in the development repo with 6 passed and 0 failed tests.
+**Closed when:** The focused Phase 1 command ran successfully in the development repo using the installed Windows PowerShell 5.1 and Pester 3.4 environment.
 ## I007 — Existing coverage of shared upstream paths
 
 **Class:** `LATER`  
@@ -100,6 +98,7 @@ Current ATM initialization expands one scalar `startValues` entry to all cores o
 
 ## Current focus
 
-**Planned next phase:** Phase 1 — pure discovery semantics.
+**Phase 2:** durable-state and recovery foundation is complete; its current integrity checks are limited to synthetic persistence/recovery contracts.
+**Phase 3:** lifecycle feasibility checkpoint complete; hybrid coordinator selected. The pure child-config, stage-evidence, and synthetic ordered-suite coordinator contracts are implemented and tested; actual child launch/runtime parsing and full CoreCycler suite progression are not started.
 
-When Phase 1 is authorized, only `I006` is currently in scope. Other issues remain deferred unless new evidence makes one a blocker.
+`I005` remains the current Phase 3 must-fix: wire stage-scoped configuration and evidence identity through the coordinator before any child result can count. All other issues remain deferred unless new evidence makes one a blocker.

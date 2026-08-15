@@ -106,7 +106,9 @@ Current discovery suite:
 
 A valid attributable failure is fail-fast for that core/candidate.
 
-Prefer a small coordinator reusing existing workload launch, affinity, completion, and parsing. Before choosing in-process stage switching, verify that CoreCycler's lifecycle can transition safely without invasive reset logic or stale state. Otherwise use the smallest hybrid orchestration preserving the same evidence contract.
+Use a minimal hybrid coordinator: it retains candidate/stage state and runs each workload stage as a fresh CoreCycler child invocation. Do not live-switch CoreCycler workload adapters in one process. CoreCycler selects startup-global configuration/adapter state, rewrites program-global configuration, and retains parser/process state; an in-process switch would require invasive reset logic and create stale-evidence risk.
+
+For each stage, the coordinator must supply non-mutating stage-specific configuration and bind the accepted terminal result to the candidate ID, stage ID, workload/config fingerprint, stage-unique log identity, child PID, and stage start time. It must verify the child exited and expected stress-process cleanup completed before the next stage. Reuse the child’s existing launch, affinity, completion, WHEA, parser, and cleanup behavior rather than duplicating them.
 
 ## Evidence and transitions
 

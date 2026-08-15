@@ -48,6 +48,7 @@ function New-DiscoveryCoreState {
         'platformMinimum'    = $PlatformMinimum
         'candidateAttemptId' = $CandidateAttemptId
         'stageAttemptIds'    = (Copy-DiscoveryCoreState -State @{ 'stageAttemptIds' = $StageAttemptIds })['stageAttemptIds']
+        'attemptStatus'      = 'PENDING'
         'lastObservedPass'   = $null
         'firstObservedFail'  = $null
         'discoveryCandidate' = $null
@@ -87,7 +88,91 @@ function Test-DiscoveryCoreCanBeScheduled {
         [Parameter(Mandatory=$true)] [hashtable] $State
     )
 
-    return !(@('DISCOVERY_CANDIDATE', 'NO_VALID_BASELINE', 'PLATFORM_LIMIT_REACHED', 'QUARANTINED_AMBIGUOUS') -contains $State['resolution'])
+    return !(@('DISCOVERY_CANDIDATE', 'NO_VALID_BASELINE', 'PLATFORM_LIMIT_REACHED', 'QUARANTINED_AMBIGUOUS') -contains $State['resolution']) -and $State['attemptStatus'] -ne 'RETRY_REQUIRED'
+}
+
+function Assert-DiscoveryStateConsistency {
+    param(
+        [Parameter(Mandatory=$true)] [hashtable] $State
+    )
+
+    if ($State['currentCandidate'] -lt $State['platformMinimum']) {
+        throw 'Discovery state candidate is below the platform minimum.'
+    }
+
+    if (!(@('PENDING', 'APPLIED_VERIFIED', 'RETRY_REQUIRED', 'QUARANTINED_INTERRUPTION') -contains $State['attemptStatus'])) {
+        throw 'Discovery state contains an unsupported attempt status.'
+    }
+
+    if ($State['attemptStatus'] -eq 'RETRY_REQUIRED' -and $null -ne $State['resolution']) {
+        throw 'A retry-required discovery state must not have a terminal resolution.'
+    }
+
+    if ($State['attemptStatus'] -eq 'QUARANTINED_INTERRUPTION' -and $State['resolution'] -ne 'QUARANTINED_AMBIGUOUS') {
+        throw 'An interruption-quarantined discovery state must be ambiguously resolved.'
+    }
+
+    if ($State['resolution'] -eq 'DISCOVERY_CANDIDATE') {
+        if ($null -eq $State['lastObservedPass'] -or $null -eq $State['firstObservedFail'] -or $null -eq $State['discoveryCandidate']) {
+            throw 'Discovery candidate resolution requires observed pass and attributable failure evidence.'
+        }
+
+        if ($State['firstObservedFail'] -ne $State['currentCandidate'] -or $State['discoveryCandidate'] -ne $State['lastObservedPass']) {
+            throw 'Discovery candidate resolution is inconsistent with its evidence.'
+        }
+    }
+}
+
+function Resolve-DiscoveryInterruption {
+    param(
+        [Parameter(Mandatory=$true)] [hashtable] $State
+    )
+
+    Assert-DiscoveryStateConsistency -State $State
+    $nextState = Copy-DiscoveryCoreState -State $State
+
+    if ($State['attemptStatus'] -eq 'APPLIED_VERIFIED') {
+        $nextState['attemptStatus'] = 'QUARANTINED_INTERRUPTION'
+        $nextState['resolution'] = 'QUARANTINED_AMBIGUOUS'
+        return [PSCustomObject]@{ Accepted = $true; Disposition = 'QUARANTINE'; State = $nextState }
+    }
+
+    if ($State['attemptStatus'] -eq 'PENDING') {
+        $nextState['attemptStatus'] = 'RETRY_REQUIRED'
+        return [PSCustomObject]@{ Accepted = $true; Disposition = 'RETRY_WITH_FRESH_IDENTITIES'; State = $nextState }
+    }
+
+    return [PSCustomObject]@{ Accepted = $false; Disposition = 'NO_RECOVERY_ACTION'; State = $nextState }
+}
+
+function New-DiscoveryRetryState {
+    param(
+        [Parameter(Mandatory=$true)] [hashtable] $State,
+        [Parameter(Mandatory=$true)] [String] $CandidateAttemptId,
+        [Parameter(Mandatory=$true)] [hashtable] $StageAttemptIds
+    )
+
+    Assert-DiscoveryStateConsistency -State $State
+
+    if ($State['attemptStatus'] -ne 'RETRY_REQUIRED') {
+        throw 'Only a retry-required discovery state can create a retry attempt.'
+    }
+
+    $priorAttemptIds = @($State['candidateAttemptId']) + @($State['stageAttemptIds'].Values)
+
+    if ($priorAttemptIds -contains $CandidateAttemptId) {
+        throw 'A retry must use a fresh candidate attempt ID.'
+    }
+
+    foreach ($stageAttemptId in $StageAttemptIds.Values) {
+        if ($priorAttemptIds -contains $stageAttemptId) {
+            throw 'A retry must use fresh stage attempt IDs.'
+        }
+    }
+
+    $retryState = New-DiscoveryCoreState -CoreNumber $State['coreNumber'] -CurrentCandidate $State['currentCandidate'] -PlatformMinimum $State['platformMinimum'] -CandidateAttemptId $CandidateAttemptId -StageAttemptIds $StageAttemptIds
+    $retryState['lastObservedPass'] = $State['lastObservedPass']
+    return $retryState
 }
 
 function Resolve-DiscoveryEvidence {
@@ -220,6 +305,7 @@ function ConvertTo-DiscoveryStateSnapshot {
 
         $stageAttemptIds = ConvertTo-DiscoveryStageAttemptIds -StageAttemptIds (Get-DiscoverySnapshotValue -InputObject $state -Name 'stageAttemptIds' -Required)
         $normalizedState = New-DiscoveryCoreState -CoreNumber $coreNumber -CurrentCandidate ([Int] (Get-DiscoverySnapshotValue -InputObject $state -Name 'currentCandidate' -Required)) -PlatformMinimum ([Int] (Get-DiscoverySnapshotValue -InputObject $state -Name 'platformMinimum' -Required)) -CandidateAttemptId ([String] (Get-DiscoverySnapshotValue -InputObject $state -Name 'candidateAttemptId' -Required)) -StageAttemptIds $stageAttemptIds
+        $normalizedState['attemptStatus'] = [String] (Get-DiscoverySnapshotValue -InputObject $state -Name 'attemptStatus' -Required)
 
         foreach ($name in @('lastObservedPass', 'firstObservedFail', 'discoveryCandidate')) {
             $value = Get-DiscoverySnapshotValue -InputObject $state -Name $name -Required
@@ -238,11 +324,12 @@ function ConvertTo-DiscoveryStateSnapshot {
             throw 'Discovery snapshot contains an unsupported resolution.'
         }
 
+        Assert-DiscoveryStateConsistency -State $normalizedState
         $statesForSnapshot[$coreNumber.ToString()] = $normalizedState
     }
 
     return @{
-        'schemaVersion' = 1
+        'schemaVersion' = 2
         'states'        = $statesForSnapshot
     }
 }
@@ -254,7 +341,7 @@ function Restore-DiscoveryStateSnapshot {
     )
 
     try {
-        if ([Int] (Get-DiscoverySnapshotValue -InputObject $Snapshot -Name 'schemaVersion' -Required) -ne 1) {
+        if ([Int] (Get-DiscoverySnapshotValue -InputObject $Snapshot -Name 'schemaVersion' -Required) -ne 2) {
             return [PSCustomObject]@{ Accepted = $false; Reason = 'unsupported_schema'; States = @{} }
         }
 
@@ -278,6 +365,7 @@ function Restore-DiscoveryStateSnapshot {
             $stateObject = $entry.Value
             $stageAttemptIds = ConvertTo-DiscoveryStageAttemptIds -StageAttemptIds (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'stageAttemptIds' -Required)
             $state = New-DiscoveryCoreState -CoreNumber ([Int] (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'coreNumber' -Required)) -CurrentCandidate ([Int] (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'currentCandidate' -Required)) -PlatformMinimum ([Int] (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'platformMinimum' -Required)) -CandidateAttemptId ([String] (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'candidateAttemptId' -Required)) -StageAttemptIds $stageAttemptIds
+            $state['attemptStatus'] = [String] (Get-DiscoverySnapshotValue -InputObject $stateObject -Name 'attemptStatus' -Required)
 
             if ($state['coreNumber'] -ne $coreNumber) {
                 throw 'Discovery snapshot core key must match the embedded core number.'
@@ -304,6 +392,7 @@ function Restore-DiscoveryStateSnapshot {
                 throw 'Discovery snapshot contains an unsupported resolution.'
             }
 
+            Assert-DiscoveryStateConsistency -State $state
             $states[$coreNumber] = $state
         }
 
@@ -328,4 +417,4 @@ function Restore-DiscoveryStateSnapshot {
     }
 }
 
-Export-ModuleMember -Function New-DiscoveryCoreState, Resolve-DiscoveryEvidence, Test-DiscoveryCoreCanBeScheduled, ConvertTo-DiscoveryStateSnapshot, Restore-DiscoveryStateSnapshot
+Export-ModuleMember -Function New-DiscoveryCoreState, New-DiscoveryRetryState, Resolve-DiscoveryEvidence, Resolve-DiscoveryInterruption, Test-DiscoveryCoreCanBeScheduled, ConvertTo-DiscoveryStateSnapshot, Restore-DiscoveryStateSnapshot
