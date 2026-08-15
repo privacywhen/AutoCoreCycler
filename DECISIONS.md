@@ -6,13 +6,13 @@ Record only settled choices not already requirements in `GOAL.md` or operating r
 
 Reopen a decision only when new evidence shows a material conflict with the goal, correctness, upstream compatibility, or a simpler durable design.
 
-## D001 — Use PR #182 ATM as the substrate
+## D001 — Use PR #182/CoreCycler infrastructure as the substrate
 
-**Decision:** Extend PR #182 ATM rather than build a second optimizer; reuse its execution, parsing, state, and recovery machinery where adequate.
+**Decision:** Reuse PR #182/CoreCycler execution, affinity, CO-map, parsing, persistence, and recovery machinery where adequate. Descending discovery is a separate policy; do not repurpose legacy uphill ATM policy transitions as a bidirectional optimizer.
 
-**Rationale:** Reduces duplicate logic, semantic divergence, and future upstream merge burden.
+**Rationale:** Reuses operational machinery while avoiding false equivalence between legacy confirmation/stabilization semantics and discovery evidence/boundaries. This minimizes duplicate mechanics, regression risk, semantic divergence, and future upstream merge burden.
 
-**Reopen if:** required discovery behaviour cannot be added cleanly without making shared ATM materially more fragile.
+**Reopen if:** no localized policy seam can satisfy discovery without making shared infrastructure materially more fragile, or a smaller shared abstraction demonstrably preserves both policies more clearly.
 
 ## D002 — Isolate the candidate to the tested core
 

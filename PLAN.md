@@ -63,17 +63,25 @@ When a phase changes shared upstream behaviour, apply the focused characterizati
 
 **Objective:** Connect discovery semantics to ATM scheduling and existing tested-core-only CO application while preserving legacy ATM.
 
+**Characterization checkpoint:** Before modifying a shared ATM/scheduler/CO path, capture focused baseline behavior only for the legacy contracts actually touched. At minimum, characterize the existing PASS-to-confirmation path, error-to-increase/reset path, `Test-AutomaticTestModeIncrease` directional clamp and `maxValue` outcome, crash/resume increase behavior, scalar `startValues` initialization, and tested-core isolation-map construction where discovery will rely on them. Do not build a broad regression suite for unrelated CoreCycler behavior.
+
 **Deliver:**
 - opt-in discovery mode;
+- a separate discovery policy branch/seam rather than a negative `incrementBy` option for legacy ATM;
 - synchronous rung scheduling and isolated candidate application;
+- a multi-core neutral discovery start that is mapped through a compatible path, or an explicit pre-integration blocker/constraint;
 - verified effective-map gate;
+- effective-map verification from actual apply/readback behavior, not intended values alone;
 - exact `N → N-1` advancement after a complete pass;
 - correct resolution, retry, and quarantine behaviour;
 - legacy `Test-AutomaticTestModeIncrease` semantics unchanged.
 
 **Gate:**
 - mocked/synthetic end-to-end rung tests pass;
+- focused baseline characterization covers each touched legacy directional contract;
 - affected legacy scheduler/WHEA/CO behaviour remains intact;
+- no discovery path changes legacy `confirmed`, `passesToConfirmCoreValue`, `maxValue`, error/reset, or crash/resume stabilization semantics;
+- multi-core neutral discovery start is either tested as compatible or explicitly blocked before a CO-application path is enabled;
 - no real stress workload or CO write is required to prove the software path;
 - diff review finds no unnecessary semantic divergence.
 

@@ -186,10 +186,12 @@ $autoModeTaskName                        = 'CoreCycler AutoMode Startup Task'
 $autoModeTaskPath                        = '\CoreCycler\'
 $autoModeTaskDescription                 = 'CoreCycler Automatic Test Mode Startup Script'
 $autoModeSchemaVersion                   = 2
+$discoveryStateHelperModule              = $PSScriptRoot + '\helpers\discovery-state.psm1'
 $autoModeResultsFileName                 = ''
 $autoModeResultsFileFullPath             = ''
 $autoModeResultsFooterWritten            = $false
 $coreStates                              = @{}
+$discoveryCoreStates                     = @{}
 $passesToConfirmCoreValue                = 3
 $repeatCoreUntilConfirmed                = $true
 $maxTestsPerCoreSanityLimit              = 0
@@ -199,6 +201,7 @@ $useResumedCoreOrder                     = $false
 $resumedCoreOrder                        = @()
 $resumedIteration                        = 1
 $resumedCoreStates                       = $null
+$resumedDiscoveryCoreStates              = $null
 $autoModeCurrentIteration                = 1
 $autoModeRemainingCoreOrder              = @()
 $autoModeCurrentTestedCore               = $CoreFromAutoMode      # -1 if no core is being tested yet, otherwise the core from the crashed run
@@ -4516,6 +4519,7 @@ function Get-ParsedAutoModeFile {
         'resumeAttempts'     = 0
         'remainingCoreOrder' = @()
         'coreStates'         = $null
+        'discoveryStates'    = $null
     }
 
 
@@ -4567,6 +4571,25 @@ function Get-ParsedAutoModeFile {
         }
 
         $autoModeInfo['coreStates'] = $parsedCoreStates
+    }
+
+    # Discovery state is optional so legacy Automatic Test Mode runs keep their existing schema and behavior.
+    # When present it must be restored as an all-or-nothing snapshot; a malformed discovery state makes this
+    # generation unusable so Get-AutoModeFileContent can fall back to the previous durable generation.
+    if ($autoModeInfoFromJson | Get-Member 'discoveryStates') {
+        try {
+            $null = Import-Module $discoveryStateHelperModule -Force -ErrorAction Stop
+            $restoredDiscoveryStates = Restore-DiscoveryStateSnapshot -Snapshot $autoModeInfoFromJson.discoveryStates
+
+            if (!$restoredDiscoveryStates.Accepted) {
+                throw ('Discovery state could not be restored: ' + $restoredDiscoveryStates.Reason)
+            }
+
+            $autoModeInfo['discoveryStates'] = $restoredDiscoveryStates.States
+        }
+        catch {
+            throw ('The .automode file contains invalid discovery state: ' + $_.Exception.Message)
+        }
     }
 
     return $autoModeInfo
@@ -4693,6 +4716,13 @@ function Save-AutoModeState {
         'resumeAttempts'     = $autoModeResumeAttempts
         'remainingCoreOrder' = @($autoModeRemainingCoreOrder)
         'coreStates'         = $coreStatesForFile
+    }
+
+    # Do not change legacy Automatic Test Mode documents unless an opt-in discovery policy has populated state.
+    # A complete snapshot is serialized in the same temp-write/parse/backup promotion transaction as coreStates.
+    if ($discoveryCoreStates.Count -gt 0) {
+        $null = Import-Module $discoveryStateHelperModule -Force -ErrorAction Stop
+        $autoModeFileObject['discoveryStates'] = ConvertTo-DiscoveryStateSnapshot -States $discoveryCoreStates
     }
 
     # Convert to JSON
@@ -6483,6 +6513,7 @@ function Initialize-AutomaticTestMode {
             # The older schema version doesn't have these entries, in which case we start the test order from the beginning again
             if ($autoModeInfo['schemaVersion'] -ge 2) {
                 $Script:resumedCoreStates           = $autoModeInfo['coreStates']
+                $Script:resumedDiscoveryCoreStates  = $autoModeInfo['discoveryStates']
                 $Script:resumedIteration            = [Int] $autoModeInfo['iteration']
                 $Script:resumedCoreOrder            = @($autoModeInfo['remainingCoreOrder'])
                 $Script:useResumedCoreOrder         = $true

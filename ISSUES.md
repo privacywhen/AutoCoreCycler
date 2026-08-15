@@ -70,15 +70,12 @@ The minimum context needed to reject stale or incompatible discovery evidence is
 
 ## I006 — Phase 1 test environment
 
-**Class:** `MUST_FIX_CURRENT_PHASE`  
+**Class:** NOT_A_PROBLEM
 **Phase:** 1
 
-The actual PowerShell/Pester environment and smallest compatible repo-local test setup have not yet been verified.
+**Resolution:** Windows PowerShell 5.1.22621.6060 and Pester 3.4.0 are installed. Pester 3 supports the repository-local focused command used by Phase 1: Invoke-Pester -Script @{ Path = 'tests\DiscoveryState.Tests.ps1' } -PassThru. No dependency-management machinery was added.
 
-**Resolve:** Inspect the installed environment before relying on the harness; avoid new dependency machinery unless required.
-
-**Close when:** the Phase 1 test command runs successfully in the development repo.
-
+**Closed when:** The focused command ran successfully in the development repo with 6 passed and 0 failed tests.
 ## I007 — Existing coverage of shared upstream paths
 
 **Class:** `LATER`  
@@ -89,6 +86,17 @@ The regression coverage for the specific PR #182/CoreCycler paths discovery will
 **Resolve:** At the start of each integration phase, identify only the shared paths actually being changed and determine whether adequate legacy coverage already exists. Add focused characterization where it does not.
 
 **Close when:** every shared path modified by discovery has adequate baseline coverage and its relevant regression checks are included in the phase gate.
+
+## I008 — Discovery starting-value compatibility
+
+**Class:** `LATER`
+**Phase:** 4
+
+Current ATM initialization expands one scalar `startValues` entry to all cores only when it matches the negative-integer form `^\s*\-\d+\s*$`. On a multi-core CPU, scalar `startValues = 0` therefore does not use the all-core expansion path, even though scalar negative starts do.
+
+**Resolve:** Before discovery CO integration, determine the smallest compatibility path for a neutral discovery start without changing legacy ATM semantics. Prefer discovery-local initialization or an independently characterized, backward-compatible shared fix only if it is genuinely required.
+
+**Close when:** Phase 4 proves multi-core neutral discovery start configuration is accepted and mapped correctly, or records a deliberate documented constraint with an approved alternative.
 
 ## Current focus
 

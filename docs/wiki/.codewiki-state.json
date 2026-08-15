@@ -1,0 +1,23 @@
+{
+  "repo_name": "AutoCoreCycler",
+  "source_path": "C:/Users/micro/OneDrive/Documents/GitHub/AutoCoreCycler",
+  "source_sha": "613dc65c78ebab8285ca81e2def6ac5ceb2959dd",
+  "generated_at": "2026-08-15T06:49:35Z",
+  "generator": "hermes-agent code-wiki skill v0.1.0",
+  "output_path": "C:/Users/micro/OneDrive/Documents/GitHub/AutoCoreCycler/docs/wiki",
+  "source_snapshot_notes": [
+    "ISSUES.md had uncommitted modifications when generated.",
+    "helpers/discovery-state.psm1 and tests/DiscoveryState.Tests.ps1 were untracked.",
+    "The discovery-state module is documented as unintegrated Phase 1 scaffolding."
+  ],
+  "modules_documented": [
+    "main-orchestrator",
+    "automatic-test-mode",
+    "persistence-and-recovery",
+    "stress-test-adapters",
+    "affinity-and-whea",
+    "discovery-state",
+    "configuration-profiles",
+    "administrative-helpers"
+  ]
+}

@@ -6,25 +6,30 @@ Current technical design for `GOAL.md`. Implementation may change when evidence 
 
 ## Architecture and upstream boundary
 
-Extend PR #182 Automatic Test Mode (ATM) rather than build a second optimizer.
+Reuse PR #182/CoreCycler execution infrastructure where adequate; do not treat its legacy Automatic Test Mode (ATM) stabilization policy as a generic bidirectional optimizer.
 
 ```text
-Upstream / PR #182 ATM
+Shared CoreCycler / PR #182 infrastructure
   core selection / affinity
-  CO application
+  CO-map construction and application
   stress-process control
-  result / WHEA parsing
-  durable state / resume
+  result / WHEA collection and parsing
+  durable state / results / resume
+  tested-core isolation-map machinery
           │
-          ▼
-Localized discovery extension
-  candidate state
-  suite/stage coordination
-  advancement gate
-  discovery-specific evidence policy
+          ├── Legacy ATM stabilization policy (unchanged)
+          │     PASS → collect same-value confirmations → `confirmed`
+          │     error/failure → increase toward `maxValue` → reset confirmations
+          │
+          └── Opt-in descending discovery policy
+                complete-suite verified PASS → candidate - 1
+                attributable failure → resolve to previous observed pass
+                ambiguous/infrastructure evidence → no silicon boundary
 ```
 
-Reuse upstream execution, parsing, CO, and recovery mechanisms. Descending discovery is opt-in; ordinary CoreCycler and PR #182 uphill ATM semantics remain unchanged.
+Reuse shared execution, parsing, affinity, CO-map, persistence, and recovery mechanisms only where their concrete contracts fit discovery. `Test-AutomaticTestModeIncrease`, legacy confirmation counters/statuses, `maxValue`, and legacy error/crash adjustment are uphill ATM policy, not discovery policy. Descending discovery is opt-in; ordinary CoreCycler and PR #182 uphill ATM semantics remain unchanged.
+
+Do not invert, rename broadly, or neutralize directional legacy paths merely for a symmetrical interface. A small shared refactor is acceptable only when it creates a real extension seam while preserving legacy behavior.
 
 Prefer, in order:
 
@@ -51,6 +56,8 @@ applyConfirmedValuesForNotTestedCores = 0
 ```
 
 Persistent per-core candidates are not the applied CPU map; only the active core receives its discovery candidate.
+
+Existing tested-core isolation-map construction is reusable infrastructure, not proof that the exact intended discovery safe map was applied. Characterize its concrete non-tested-core behavior before relying on it for discovery evidence.
 
 ### Rung scheduler
 
